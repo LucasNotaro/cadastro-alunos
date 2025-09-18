@@ -1,100 +1,141 @@
-// expressjs.com
-//ttps://expressjs.com/en/resources/middleware/method-override.html
+// Server/index.js
+// Requisitos: Node 18+ (tem fetch nativo). Se estiver em Node <18, instale axios e troque o fetch.
 
 const express = require('express');
 const bodyparser = require('body-parser');
 const cors = require('cors');
 const methodOverride = require('method-override');
 const mongoose = require('mongoose');
-const port = 3000;
-// criar um objeto express
-const app = express();
-//vincualr o middleware ao express
-app.use(cors());
 
-// permissão para usar outros métodos HTTP
+const app = express();
+const port = 3000;
+
+// Middlewares básicos
+app.use(cors());
 app.use(methodOverride('X-HTTP-Method'));
 app.use(methodOverride('X-HTTP-Method-Override'));
 app.use(methodOverride('X-Method-Override'));
 app.use(methodOverride('_method'));
 
-//permissão servidor
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Headers',
-    'Origin, X-Requested-With, Content-Type, Accept');
+  res.header(
+    'Access-Control-Allow-Headers',
+    'Origin, X-Requested-With, Content-Type, Accept'
+  );
+  res.header('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
   next();
-})
+});
 
 app.use(bodyparser.json());
 app.use(bodyparser.urlencoded({ extended: false }));
 
-//  fazer a conexão com o banco de dados mongoose
- let  url = "mongodb://localhost:27017/FatecVotorantim";
+// MongoDB
+const url = 'mongodb://localhost:27017/FatecVotorantim';
+mongoose.connect(url)
+  .then(() => console.log('MongoDB connected...'))
+  .catch((err) => console.log('Erro na conexão:', err?.message ?? err));
 
- // testa a conexão
- mongoose.connect(url)
- .then(
-     () => console.log('MongoDB connected...') )
- .catch(
-   () => { console.log("erro na conexão: " ) }
-  );
+// ===== Schema/Model =====
+const AlunoSchema = new mongoose.Schema({
+  matricula: { type: String, required: true },
+  nome:      { type: String, required: true },
+  endereco: {
+    cep:         { type: String, default: '' },
+    logradouro:  { type: String, default: '' },
+    cidade:      { type: String, default: '' },
+    bairro:      { type: String, default: '' },
+    estado:      { type: String, default: '' },
+    numero:      { type: String, default: '' },
+    complemento: { type: String, default: '' }
+  },
+  cursos: [{ type: String }]
+}, { timestamps: true });
 
-// estrutura da mongodb para armazenar os dados
-var User = mongoose.model('Usuario', { nome: String });
+const Aluno = mongoose.model('Aluno', AlunoSchema);
 
-// inserir dados
+// ===== Rotas ViaCEP (proxy simples) =====
+app.get('/viacep/:cep', async (req, res) => {
+  try {
+    const cep = (req.params.cep || '').replace(/\D/g, '');
+    if (cep.length !== 8) return res.status(400).json({ erro: 'CEP inválido (use 8 dígitos).' });
 
-app.post('/inseir', async(req, res) => {
-    let corpo = req.body.name;
-    //let corpo = "Ricardo";
-    let user = await new User({ nome: corpo });
-    user.save().then(() => console.log('Usuário salvo com sucesso'));
-    res.send({status:'adicionado'});
-    // respostar que tem voltar json
-    res.json({"status": "adicionado com sucesso"});
-})
+    const resp = await fetch(`https://viacep.com.br/ws/${cep}/json/`);
+    const data = await resp.json();
 
-// deletar dados campo nome
-app.delete('/deletar', async(req, res) => {
-  let corpo = req.body.name;
-  await User.deleteOne({ nome: corpo });
-  res.json({"status": "deletado com sucesso"});
+    if (data.erro) {
+      return res.status(404).json({ erro: 'CEP não encontrado.' });
+    }
+
+    // Mapeia para o nosso padrão front-end (logradouro, bairro, localidade->cidade, uf->estado)
+    res.json({
+      cep: data.cep,
+      logradouro: data.logradouro || '',
+      bairro: data.bairro || '',
+      cidade: data.localidade || '',
+      estado: data.uf || ''
+    });
+  } catch (e) {
+    res.status(500).json({ erro: 'Falha ao consultar ViaCEP.' });
+  }
 });
 
-// DELETA POR ID
-app.delete('/deletar/:id', async(req, res) => {
-  let id = req.params.id;
-  await User.deleteOne({ _id: id });
-  res.json({"status": "deletado com sucesso"});
+// ===== CRUD RESTful de Alunos =====
+
+// LISTAR TODOS
+app.get('/alunos', async (req, res) => {
+  const alunos = await Aluno.find().sort({ createdAt: -1 });
+  res.json(alunos);
 });
 
-// ALTERAR DADOS
-
-app.put('/alterar/:id', async(req, res) => {
-  let id = req.params.id;
-  let corpo =   req.body.name;  
-  await User.updateOne({ _id: id }, { nome: corpo });
-  res.json({"status": "alterado com sucesso"});
+// OBTER POR ID
+app.get('/alunos/:id', async (req, res) => {
+  try {
+    const aluno = await Aluno.findById(req.params.id);
+    if (!aluno) return res.status(404).json({ erro: 'Aluno não encontrado.' });
+    res.json(aluno);
+  } catch {
+    res.status(400).json({ erro: 'ID inválido.' });
+  }
 });
 
-// Middleware to parse JSON bodies rota
-app.get('/', async (req, res) => {
-   let user = await User.find({});
-   if(user.length > 0){
-     res.json(user);  
-   }else{
-      res.json({"status": "vazio"});
-   } 
-  })
-
-// id
-app.get('/:id', async(req, res) => {
-  let id = req.params.id;
-  let user = await User.findOne({ _id: id });
-  res.json(user);   
+// CRIAR
+app.post('/alunos', async (req, res) => {
+  try {
+    const novo = await Aluno.create(req.body);
+    res.status(201).json(novo);
+  } catch (e) {
+    res.status(400).json({ erro: 'Dados inválidos para criação.', detalhe: e?.message });
+  }
 });
 
+// ATUALIZAR
+app.put('/alunos/:id', async (req, res) => {
+  try {
+    const atualizado = await Aluno.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true, runValidators: true }
+    );
+    if (!atualizado) return res.status(404).json({ erro: 'Aluno não encontrado.' });
+    res.json(atualizado);
+  } catch (e) {
+    res.status(400).json({ erro: 'Falha ao atualizar.', detalhe: e?.message });
+  }
+});
+
+// EXCLUIR
+app.delete('/alunos/:id', async (req, res) => {
+  try {
+    const deletado = await Aluno.findByIdAndDelete(req.params.id);
+    if (!deletado) return res.status(404).json({ erro: 'Aluno não encontrado.' });
+    res.json({ status: 'deletado com sucesso' });
+  } catch {
+    res.status(400).json({ erro: 'ID inválido.' });
+  }
+});
+
+// Subir servidor
 app.listen(port, () => {
-  console.log(`Example app listening on port http://localhost:${port}`)
-})
+  console.log(`API rodando em http://localhost:${port}`);
+});
