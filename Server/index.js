@@ -1,6 +1,3 @@
-// Server/index.js
-// Requisitos: Node 18+ (tem fetch nativo). Se estiver em Node <18, instale axios e troque o fetch.
-
 const express = require('express');
 const bodyparser = require('body-parser');
 const cors = require('cors');
@@ -10,7 +7,6 @@ const mongoose = require('mongoose');
 const app = express();
 const port = 3000;
 
-// Middlewares básicos
 app.use(cors());
 app.use(methodOverride('X-HTTP-Method'));
 app.use(methodOverride('X-HTTP-Method-Override'));
@@ -54,7 +50,7 @@ const AlunoSchema = new mongoose.Schema({
 
 const Aluno = mongoose.model('Aluno', AlunoSchema);
 
-// ===== Rotas ViaCEP (proxy simples) =====
+// ===== Rotas ViaCEP =====
 app.get('/viacep/:cep', async (req, res) => {
   try {
     const cep = (req.params.cep || '').replace(/\D/g, '');
@@ -67,7 +63,6 @@ app.get('/viacep/:cep', async (req, res) => {
       return res.status(404).json({ erro: 'CEP não encontrado.' });
     }
 
-    // Mapeia para o nosso padrão front-end (logradouro, bairro, localidade->cidade, uf->estado)
     res.json({
       cep: data.cep,
       logradouro: data.logradouro || '',

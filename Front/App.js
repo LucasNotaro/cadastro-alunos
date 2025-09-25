@@ -1,4 +1,3 @@
-// App.js
 import { StatusBar } from 'expo-status-bar';
 import React, { useEffect, useState } from 'react';
 import {
@@ -209,7 +208,7 @@ function Detalhe({ aluno, onVoltar, styles }) {
 export default function App() {
   // Ajuste para seu ambiente: localhost / 10.0.2.2 / IP da máquina
   // const url = 'http://localhost:3000';
-  // const url = 'http://10.0.2.2:3000'; // emulador Android
+  // const url = 'http://10.0.2.2:3000';
   const url = 'http://192.168.50.64:3000';
 
   const [tela, setTela] = useState('lista'); // 'lista' | 'form' | 'detalhe'
@@ -421,10 +420,10 @@ const styles = StyleSheet.create({
   section: { marginTop: 10, fontWeight: '600' },
   card: { padding: 12, borderWidth: 1, borderColor: '#eee', borderRadius: 10, backgroundColor: '#fafafa' },
   cardTitle: { fontSize: 16, fontWeight: '600' },
-  cardSub: { color: '#666', marginTop: 4 },
+  cardSub: { color: '#656060ff', marginTop: 4 },
   actions: { flexDirection: 'row', gap: 8, marginTop: 8 },
   btn: { backgroundColor: '#222', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8 },
-  btnDanger: { backgroundColor: '#a00' },
+  btnDanger: { backgroundColor: 'rgba(206, 19, 19, 1)' },
   btnText: { color: '#fff' },
   detail: { marginBottom: 6 },
   bold: { fontWeight: '600' },
